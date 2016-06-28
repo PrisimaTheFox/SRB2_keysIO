@@ -17,14 +17,26 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "../i_system.h"
+#include "../doomdef.h"
+#include "../m_misc.h"
 
 
 
 #define IO_INPUT	1
 #define IO_OUTPUT	2
 
+#define FILELIMIT 1024*1024 // Size limit for reading/writing files
+
 
 static const char *const fnames[] = {"input", "output"};
+static const char *whitelist[] = { // Allow scripters to write files of these types to SRB2's folder
+	".txt",
+	".sav2",
+	".cfg",
+	".png",
+	".bmp"
+};
 
 
 static int pushresult (lua_State *L, int i, const char *filename) {
@@ -103,17 +115,6 @@ static int io_noclose (lua_State *L) {
 
 
 /*
-** function to close 'popen' files
-*/
-static int io_pclose (lua_State *L) {
-  FILE **p = tofilep(L);
-  int ok = lua_pclose(L, *p);
-  *p = NULL;
-  return pushresult(L, ok, NULL);
-}
-
-
-/*
 ** function to close regular files
 */
 static int io_fclose (lua_State *L) {
@@ -157,26 +158,59 @@ static int io_tostring (lua_State *L) {
   return 1;
 }
 
-
-static int io_open (lua_State *L) {
-  const char *filename = luaL_checkstring(L, 1);
-  const char *mode = luaL_optstring(L, 2, "r");
-  FILE **pf = newfile(L);
-  *pf = fopen(filename, mode);
-  return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
+static int StartsWith(const char *a, const char *b) // this is wolfs being lazy yet again
+{
+   if(strncmp(a, b, strlen(b)) == 0) return 1;
+   return 0;
 }
 
 
-/*
-** this function has a separated environment, which defines the
-** correct __close for 'popen' files
-*/
-static int io_popen (lua_State *L) {
-  const char *filename = luaL_checkstring(L, 1);
-  const char *mode = luaL_optstring(L, 2, "r");
-  FILE **pf = newfile(L);
-  *pf = lua_popen(L, filename, mode);
-  return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
+static int io_open (lua_State *L) {
+	FILE **pf;
+	const char *filename = luaL_checkstring(L, 1);
+	int pass = 0;
+	size_t i;
+	int length = strlen(filename);
+	char *splitter, *forward, *backward;
+	char *destFilename;
+	const char *mode = luaL_optstring(L, 2, "r");
+
+	for (i = 0; i < (sizeof (whitelist) / sizeof(const char *)); i++)
+	{
+		if (!stricmp(&filename[length - strlen(whitelist[i])], whitelist[i]))
+		{
+			pass = 1;
+			break;
+		}
+	}
+	if (strstr(filename, "..") || strchr(filename, ':') || StartsWith(filename, "\\")
+		|| StartsWith(filename, "/") || !pass)
+	{
+		luaL_error(L,"access denied to %s", filename);
+		return pushresult(L,0,filename);
+	}
+
+	destFilename = va("luafiles"PATHSEP"%s", filename);
+
+	// Make directories as needed
+	splitter = destFilename;
+
+    forward = strchr(splitter, '/');
+    backward = strchr(splitter, '\\');
+	while ((splitter = (forward && backward) ? min(forward, backward) : (forward ?: backward)))
+	{
+		*splitter = 0;
+		I_mkdir(destFilename, 0755);
+		*splitter = '/'; 
+		splitter++;
+
+        forward = strchr(splitter, '/');
+        backward = strchr(splitter, '\\');
+	}
+
+	pf = newfile(L);
+	*pf = fopen(destFilename, mode);
+	return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
 }
 
 
@@ -410,6 +444,7 @@ static int io_readline (lua_State *L) {
 static int g_write (lua_State *L, FILE *f, int arg) {
   int nargs = lua_gettop(L) - 1;
   int status = 1;
+  size_t count;
   for (; nargs--; arg++) {
     if (lua_type(L, arg) == LUA_TNUMBER) {
       /* optimization: could be done exactly as for strings */
@@ -419,6 +454,12 @@ static int g_write (lua_State *L, FILE *f, int arg) {
     else {
       size_t l;
       const char *s = luaL_checklstring(L, arg, &l);
+	  count += l;
+	  if (ftell(f) + l > FILELIMIT)
+	  {
+		luaL_error(L,"write limit bypassed in file. Changes have been discarded.");
+		break;
+	  }
       status = status && (fwrite(s, sizeof(char), l, f) == l);
     }
   }
@@ -481,7 +522,6 @@ static const luaL_Reg iolib[] = {
   {"lines", io_lines},
   {"open", io_open},
   {"output", io_output},
-  {"popen", io_popen},
   {"read", io_read},
   {"tmpfile", io_tmpfile},
   {"type", io_type},
@@ -544,9 +584,5 @@ LUALIB_API int luaopen_io (lua_State *L) {
   createstdfile(L, stdout, IO_OUTPUT, "stdout");
   createstdfile(L, stderr, 0, "stderr");
   lua_pop(L, 1);  /* pop environment for default files */
-  lua_getfield(L, -1, "popen");
-  newfenv(L, io_pclose);  /* create environment for 'popen' */
-  lua_setfenv(L, -2);  /* set fenv for 'popen' */
-  lua_pop(L, 1);  /* pop 'popen' */
   return 1;
 }
