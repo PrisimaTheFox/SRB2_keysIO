@@ -1681,11 +1681,11 @@ boolean G_Responder(event_t *ev)
 	//Key Presses -Prisima
 	if (ev->type == ev_keydown && ev->data1)
 	{
-		players[consoleplayer].pressed_key = ev->data1;
+		players[consoleplayer].keypress = ev->data1;
 	}
 	else
 	{
-		players[consoleplayer].pressed_key = 0;
+		players[consoleplayer].keypress = 0;
 	}
 	
 	// allow spy mode changes even during the demo
