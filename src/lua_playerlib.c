@@ -314,6 +314,9 @@ static int player_get(lua_State *L)
 		lua_pushinteger(L, plr->bot);
 	else if (fastcmp(field,"jointime"))
 		lua_pushinteger(L, plr->jointime);
+	//Key press
+	else if (fastcmp(field,"keypress"))
+		lua_pushinteger(L, plr->keypress);
 #ifdef HWRENDER
 	else if (fastcmp(field,"fovadd"))
 		lua_pushfixed(L, plr->fovadd);
