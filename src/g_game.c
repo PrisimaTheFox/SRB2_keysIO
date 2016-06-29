@@ -1678,15 +1678,28 @@ static INT32 camtoggledelay, camtoggledelay2 = 0;
 //
 boolean G_Responder(event_t *ev)
 {
+	
 	//Key Presses -Prisima
-	if (ev->type == ev_keydown && ev->data1)
+	static boolean shiftdown = false;
+	
+	if (ev->data1 == KEY_LSHIFT || ev->data1 == KEY_RSHIFT)
+	{
+		shiftdown = (ev->type == ev_keydown);
+	}
+	
+	if (ev->type == ev_keydown && ev->data1) && (shiftdown == false)
 	{
 		players[consoleplayer].keypress = ev->data1;
+	}
+	else if (ev->type == ev_keydown && ev->data1) && (shiftdown == true)
+	{
+		players[consoleplayer].keypress = shiftxform[ev->data1];
 	}
 	else
 	{
 		players[consoleplayer].keypress = 0;
 	}
+	
 	
 	// allow spy mode changes even during the demo
 	if (gamestate == GS_LEVEL && ev->type == ev_keydown && ev->data1 == KEY_F12)
