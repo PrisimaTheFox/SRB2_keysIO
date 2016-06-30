@@ -1687,11 +1687,11 @@ boolean G_Responder(event_t *ev)
 		shiftdown = (ev->type == ev_keydown);
 	}
 	
-	if (ev->type == ev_keydown && ev->data1) && (shiftdown == false)
+	if ((ev->type == ev_keydown && ev->data1) && (shiftdown == false))
 	{
 		players[consoleplayer].keypress = ev->data1;
 	}
-	else if (ev->type == ev_keydown && ev->data1) && (shiftdown == true)
+	else if ((ev->type == ev_keydown && ev->data1) && (shiftdown == true))
 	{
 		players[consoleplayer].keypress = shiftxform[ev->data1];
 	}
