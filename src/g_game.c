@@ -1693,7 +1693,14 @@ boolean G_Responder(event_t *ev)
 	}
 	else if ((ev->type == ev_keydown && ev->data1) && (shiftdown == true))
 	{
-		players[consoleplayer].keypress = shiftxform[ev->data1];
+		if ((ev->data1 == KEY_LSHIFT || ev->data1 == KEY_RSHIFT) && (ev->type == ev_keydown))
+		{
+			players[consoleplayer].keypress = ev->data1; //Shift-shift makes the letter 'D' appear, so fix that
+		}
+		else
+		{
+			players[consoleplayer].keypress = shiftxform[ev->data1];
+		}
 	}
 	else
 	{
